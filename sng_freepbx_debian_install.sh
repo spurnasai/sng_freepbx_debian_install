@@ -45,32 +45,32 @@ echo "" > $log
 POSITIONAL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
-	case $1 in
-		--testing)
-			testrepo=true
-			shift # past argument
-			;;
-		--nofreepbx)
-			nofpbx=true
-			shift # past argument
-			;;
-		--noasterisk)
-			noast=true
-			shift # past argument
-			;;
-		--noioncube)
-			noioncube=true
-			shift # past argument
-			;;
-		-*|--*)
-			echo "Unknown option $1"
-			exit 1
-			;;
-		*)
-			POSITIONAL_ARGS+=("$1") # save positional arg
-			shift # past argument
-			;;
-	esac
+        case $1 in
+                --testing)
+                        testrepo=true
+                        shift # past argument
+                        ;;
+                --nofreepbx)
+                        nofpbx=true
+                        shift # past argument
+                        ;;
+                --noasterisk)
+                        noast=true
+                        shift # past argument
+                        ;;
+                --noioncube)
+                        noioncube=true
+                        shift # past argument
+                        ;;
+                -*|--*)
+                        echo "Unknown option $1"
+                        exit 1
+                        ;;
+                *)
+                        POSITIONAL_ARGS+=("$1") # save positional arg
+                        shift # past argument
+                        ;;
+        esac
 done
 
 
@@ -79,166 +79,147 @@ exec 2>>${LOG_FILE}
 
 # Function to log messages
 log() {
-	echo "$(date +"%Y-%m-%d %T") - $*" >> "$LOG_FILE"
+        echo "$(date +"%Y-%m-%d %T") - $*" >> "$LOG_FILE"
 }
 
 message() {
-	echo "$(date +"%Y-%m-%d %T") - $*"
-	log "$*"
+        echo "$(date +"%Y-%m-%d %T") - $*"
+        log "$*"
 }
 
 #Function to record and display the current step
 setCurrentStep () {
-	currentStep="$1"
-	message "${currentStep}"
+        currentStep="$1"
+        message "${currentStep}"
 }
 
 # Function to cleanup installation
 terminate() {
-	# removing pid file
-	message "Exiting script"
-	rm -f "$pidfile"
+        # removing pid file
+        message "Exiting script"
+        rm -f "$pidfile"
 }
 
 #Function to log error and location
 errorHandler() {
-	log "****** INSTALLATION FAILED *****"
-	message "Installation failed at step ${currentStep}. Please check log ${LOG_FILE} for details."
-	message "Error at line line: $1 exiting with code $2 (last command was: $3)"
-	exit "$2"
+        log "****** INSTALLATION FAILED *****"
+        message "Installation failed at step ${currentStep}. Please check log ${LOG_FILE} for details."
+        message "Error at line line: $1 exiting with code $2 (last command was: $3)"
+        exit "$2"
 }
 
 # Checking if the package is already installed or not
 isinstalled() {
-	PKG_OK=$(/usr/bin/dpkg-query -W --showformat='${Status}\n' "$@" 2>/dev/null|grep "install ok installed")
-	if [ "" = "$PKG_OK" ]; then
-		false
-	else
-		true
-	fi
+        PKG_OK=$(/usr/bin/dpkg-query -W --showformat='${Status}\n' "$@" 2>/dev/null|grep "install ok installed")
+        if [ "" = "$PKG_OK" ]; then
+                false
+        else
+                true
+        fi
 }
 
 # Function to install the package
 pkg_install() {
-	log "############################### "
-	PKG=$@
-	if isinstalled $PKG; then
-		log "$PKG already present ...."
-	else
-		message "Installing $PKG ...."
-		apt-get -y --ignore-missing -o DPkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" install $PKG >> $log 2>&1
-		if isinstalled $PKG; then
-			message "$PKG installed successfully...."
-		else
-			message "$PKG failed to install ...."
-			message "Exiting the installation process as dependent $PKG failed to install ...."
-			terminate
-		fi
-	fi
-	log "############################### "
+        log "############################### "
+        PKG=$@
+        if isinstalled $PKG; then
+                log "$PKG already present ...."
+        else
+                message "Installing $PKG ...."
+                apt-get -y --ignore-missing -o DPkg::Options::="--force-confnew" -o Dpkg::Options::="--force-overwrite" install $PKG >> $log 2>&1
+                if isinstalled $PKG; then
+                        message "$PKG installed successfully...."
+                else
+                        message "$PKG failed to install ...."
+                        message "Exiting the installation process as dependent $PKG failed to install ...."
+                        terminate
+                fi
+        fi
+        log "############################### "
 }
 
 # Function to install the mongodb
 install_mongodb() {
-	if isinstalled mongodb-org; then
-		log "mongodb already installed ...."
-	else
-		message "Installing  mongodb...."
-		# Ref - https://medium.com/@arun0808rana/mongodb-installation-on-debian-12-8001d0dafb56
-		apt-get install -y mongodb-org >> "$log" 2>&1
+        if isinstalled mongodb-org; then
+                log "mongodb already installed ...."
+        else
+                message "Installing  mongodb...."
+                # Ref - https://medium.com/@arun0808rana/mongodb-installation-on-debian-12-8001d0dafb56
+                apt-get install -y mongodb-org >> "$log" 2>&1
 
-		if isinstalled mongodb-org; then
-			message "Mongodb installed successfully...."
-		else
-			message "Mongodb failed to install ...."
-			exit 1
-		fi
-	fi
-}
-
-
-# Function to install the libfdk-aac
-install_libfdk() {
-      if isinstalled libfdk-aac2; then
-            log "libfdk-aac2 already installed ...."
-      else
-            message "Installing libfdk-aac2...."
-            apt-get install -y libfdk-aac2 >> "$log" 2>&1
-      if isinstalled libfdk-aac2; then
-            message "libfdk-aac2 installed successfully....."
-      else
-            message "libfdk-aac2 failed to install ...."
-            exit 1
-      fi
-fi
+                if isinstalled mongodb-org; then
+                        message "Mongodb installed successfully...."
+                else
+                        message "Mongodb failed to install ...."
+                        exit 1
+                fi
+        fi
 }
 
 # Function to install the asterisk and dependent packages
 install_asterisk() {
-	astver=$1
-	ASTPKGS=("addons"
-		"addons-bluetooth"
-		"addons-core"
-		"addons-mysql"
-		"addons-ooh323"
-		"core"
-		"curl"
-		"dahdi"
-		"doc"
-		"odbc"
-		"ogg"
-		"flite"
-		"g729"
-		"resample"
-		"snmp"
-		"speex"
-		"sqlite3"
-		"res-digium-phone"
-		"voicemail"
-	)
+        astver=$1
+        ASTPKGS=("addons"
+                "addons-bluetooth"
+                "addons-core"
+                "addons-mysql"
+                "addons-ooh323"
+                "core"
+                "curl"
+                "dahdi"
+                "doc"
+                "odbc"
+                "ogg"
+                "flite"
+                "g729"
+                "resample"
+                "snmp"
+                "speex"
+                "sqlite3"
+                "res-digium-phone"
+                "voicemail"
+        )
 
-	# creating directories
-	mkdir -p /var/lib/asterisk/moh
-	pkg_install asterisk$astver
+        # creating directories
+        mkdir -p /var/lib/asterisk/moh
+        pkg_install asterisk$astver
 
-	for i in "${!ASTPKGS[@]}"; do
-		pkg_install asterisk$astver-${ASTPKGS[$i]}
-	done
+        for i in "${!ASTPKGS[@]}"; do
+                pkg_install asterisk$astver-${ASTPKGS[$i]}
+        done
 
-	pkg_install asterisk$astver.0-freepbx-asterisk-modules
-	pkg_install asterisk-version-switch
-	pkg_install asterisk-sounds-*
+        pkg_install asterisk$astver.0-freepbx-asterisk-modules
+        pkg_install asterisk-version-switch
+        pkg_install asterisk-sounds-*
 }
 
 setup_repositories() {
-	#Add PHP repository
-	wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
-	if [ "${DISTRIBUTION}" = "Ubuntu" ]; then
-	    add-apt-repository -y "ppa:ondrej/php" >> "$log" 2>&1
-	    add-apt-repository -y "ppa:ondrej/apache2" >> "$log" 2>&1
-	else
-		add-apt-repository -y -S "deb [ arch=${arch} ] https://packages.sury.org/php/ $(lsb_release -sc) main" >> "$log" 2>&1
-	fi
+        #Add PHP repository
+        wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
+        if [ "${DISTRIBUTION}" = "Ubuntu" ]; then
+            add-apt-repository -y "ppa:ondrej/php" >> "$log" 2>&1
+            add-apt-repository -y "ppa:ondrej/apache2" >> "$log" 2>&1
+        else
+                add-apt-repository -y -S "deb [ arch=${arch} ] https://packages.sury.org/php/ $(lsb_release -sc) main" >> "$log" 2>&1
+        fi
 
-	apt-key del "9641 7C6E 0423 6E0A 986B  69EF DE82 7447 3C8D 0E52" >> "$log" 2>&1
+        apt-key del "9641 7C6E 0423 6E0A 986B  69EF DE82 7447 3C8D 0E52" >> "$log" 2>&1
 
-	wget -qO - http://deb.freepbx.org/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg  >> "$log" 2>&1
+        wget -qO - http://deb.freepbx.org/gpg/aptly-pubkey.asc | gpg --dearmor --yes -o /etc/apt/trusted.gpg.d/freepbx.gpg  >> "$log" 2>&1
 
-	# Setting our default repo server
-	if [ $testrepo ] ; then
-		add-apt-repository -y -S "deb [ arch=${arch} ] http://deb.freepbx.org/freepbx17-dev bookworm main" >> "$log" 2>&1
-		add-apt-repository -y -S "deb [ arch=${arch} ] http://deb.freepbx.org/freepbx17-dev bookworm main" >> "$log" 2>&1
-	else
-		add-apt-repository -y -S "deb [ arch=${arch} ] http://deb.freepbx.org/freepbx17-prod bookworm main" >> "$log" 2>&1
-		add-apt-repository -y -S "deb [ arch=${arch} ] http://deb.freepbx.org/freepbx17-prod bookworm main" >> "$log" 2>&1
-	fi
+        # Setting our default repo server
+        if [ $testrepo ] ; then
+                add-apt-repository -y -S "deb [ arch=${arch} ] http://deb.freepbx.org/freepbx17-dev bookworm main" >> "$log" 2>&1
+                add-apt-repository -y -S "deb [ arch=${arch} ] http://deb.freepbx.org/freepbx17-dev bookworm main" >> "$log" 2>&1
+        else
+                add-apt-repository -y -S "deb [ arch=${arch} ] http://deb.freepbx.org/freepbx17-prod bookworm main" >> "$log" 2>&1
+                add-apt-repository -y -S "deb [ arch=${arch} ] http://deb.freepbx.org/freepbx17-prod bookworm main" >> "$log" 2>&1
+        fi
 
-	wget -qO - https://pgp.mongodb.com/server-7.0.asc | gpg  --dearmor --yes -o /etc/apt/trusted.gpg.d/mongodb-server-7.0.gpg >> "$log" 2>&1
-	add-apt-repository -y -S "deb [ arch=${arch} ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" >> "$log" 2>&1
+        wget -qO - https://pgp.mongodb.com/server-7.0.asc | gpg  --dearmor --yes -o /etc/apt/trusted.gpg.d/mongodb-server-7.0.gpg >> "$log" 2>&1
+        add-apt-repository -y -S "deb [ arch=${arch} ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" >> "$log" 2>&1
 
-      add-apt-repository -y -S "deb http://ftp.debian.org/debian/ stable main non-free" >> "$log" 2>&1
-
-	setCurrentStep "Setting up Sangoma repository"
+        setCurrentStep "Setting up Sangoma repository"
 cat <<EOF> /etc/apt/preferences.d/99sangoma-fpbx-repository
 # Allways prefer packages from deb.freepbx.org
 
@@ -261,14 +242,14 @@ pid="$$"
 pidfile='/var/run/freepbx17_installer.pid'
 
 if [ -f "$pidfile" ]; then
-	log "Previous PID file found."
-	if ps -p "${pid}" > /dev/null
-	then
-		message "FreePBX 17 installation process is already going on (PID=${pid}), hence not starting new process"
-		exit 1;
-	fi
-	log "Removing stale PID file"
-	rm -f "${pidfile}"
+        log "Previous PID file found."
+        if ps -p "${pid}" > /dev/null
+        then
+                message "FreePBX 17 installation process is already going on (PID=${pid}), hence not starting new process"
+                exit 1;
+        fi
+        log "Removing stale PID file"
+        rm -f "${pidfile}"
 fi
 
 setCurrentStep "Starting installation."
@@ -313,116 +294,116 @@ apt-cache policy  >> $log 2>&1
 # Install dependent packages
 setCurrentStep "Installing required packages"
 DEPPKGS=("redis-server"
-	"libsnmp-dev"
-	"libtonezone-dev"
-	"libpq-dev"
-	"liblua5.2-dev"
-	"libpri-dev"
-	"libbluetooth-dev"
-	"libunbound-dev"
-	"libsybdb5"
-	"libspeexdsp-dev"
-	"libiksemel-dev"
-	"libresample1-dev"
-	"libgmime-3.0-dev"
-	"libc-client2007e-dev"
-	"dpkg-dev"
-	"ghostscript"
-	"libtiff-tools"
-	"iptables-persistent"
-	"net-tools"
-	"rsyslog"
-	"libavahi-client3"
-	"nmap"
-	"apache2"
-	"zip"
-	"incron"
-	"chrony"
-	"wget"
-	"vim"
-	"build-essential"
-	"openssh-server"
-	"apache2"
-	"mariadb-server"
-	"mariadb-client"
-	"bison"
-	"flex"
-	"flite"
-	"php${PHPVERSION}"
-	"php${PHPVERSION}-curl"
-	"php${PHPVERSION}-zip"
-	"php${PHPVERSION}-redis"
-	"php${PHPVERSION}-curl"
-	"php${PHPVERSION}-cli"
-	"php${PHPVERSION}-common"
-	"php${PHPVERSION}-mysql"
-	"php${PHPVERSION}-gd"
-	"php${PHPVERSION}-mbstring"
-	"php${PHPVERSION}-intl"
-	"php${PHPVERSION}-xml"
-	"php${PHPVERSION}-bz2"
-	"php${PHPVERSION}-ldap"
-	"php-soap"
-	"php-pear"
-	"curl"
-	"sox"
-	"libncurses5-dev"
-	"libssl-dev"
-	"mpg123"
-	"libxml2-dev"
-	"libnewt-dev"
-	"sqlite3"
-	"libsqlite3-dev"
-	"pkg-config"
-	"automake"
-	"libtool"
-	"autoconf"
-	"git"
-	"unixodbc-dev"
-	"uuid"
-	"uuid-dev"
-	"libasound2-dev"
-	"libogg-dev"
-	"libvorbis-dev"
-	"libicu-dev"
-	"libcurl4-openssl-dev"
-	"odbc-mariadb"
-	"libical-dev"
-	"libneon27-dev"
-	"libsrtp2-dev"
-	"libspandsp-dev"
-	"sudo"
-	"subversion"
-	"libtool-bin"
-	"python-dev-is-python3"
-	"unixodbc"
-	"libjansson-dev"
-	"nodejs"
-	"npm"
-	"ipset"
-	"iptables"
-	"fail2ban"
-	"htop"
-	"liburiparser-dev"
-	"postfix"
-	"tcpdump"
-	"sngrep"
-	"libavdevice-dev"
-	"tftpd-hpa"
-	"xinetd"
-	"lame"
-	"haproxy"
-	"screen"
-	"easy-rsa"
-	"openvpn"
-	"sysstat"
-	"apt-transport-https"
-	"lsb-release"
-	"ca-certificates"
- 	"cron"
+        "libsnmp-dev"
+        "libtonezone-dev"
+        "libpq-dev"
+        "liblua5.2-dev"
+        "libpri-dev"
+        "libbluetooth-dev"
+        "libunbound-dev"
+        "libsybdb5"
+        "libspeexdsp-dev"
+        "libiksemel-dev"
+        "libresample1-dev"
+        "libgmime-3.0-dev"
+        "libc-client2007e-dev"
+        "dpkg-dev"
+        "ghostscript"
+        "libtiff-tools"
+        "iptables-persistent"
+        "net-tools"
+        "rsyslog"
+        "libavahi-client3"
+        "nmap"
+        "apache2"
+        "zip"
+        "incron"
+        "chrony"
+        "wget"
+        "vim"
+        "build-essential"
+        "openssh-server"
+        "apache2"
+        "mariadb-server"
+        "mariadb-client"
+        "bison"
+        "flex"
+        "flite"
+        "php${PHPVERSION}"
+        "php${PHPVERSION}-curl"
+        "php${PHPVERSION}-zip"
+        "php${PHPVERSION}-redis"
+        "php${PHPVERSION}-curl"
+        "php${PHPVERSION}-cli"
+        "php${PHPVERSION}-common"
+        "php${PHPVERSION}-mysql"
+        "php${PHPVERSION}-gd"
+        "php${PHPVERSION}-mbstring"
+        "php${PHPVERSION}-intl"
+        "php${PHPVERSION}-xml"
+        "php${PHPVERSION}-bz2"
+        "php${PHPVERSION}-ldap"
+        "php-soap"
+        "php-pear"
+        "curl"
+        "sox"
+        "libncurses5-dev"
+        "libssl-dev"
+        "mpg123"
+        "libxml2-dev"
+        "libnewt-dev"
+        "sqlite3"
+        "libsqlite3-dev"
+        "pkg-config"
+        "automake"
+        "libtool"
+        "autoconf"
+        "git"
+        "unixodbc-dev"
+        "uuid"
+        "uuid-dev"
+        "libasound2-dev"
+        "libogg-dev"
+        "libvorbis-dev"
+        "libicu-dev"
+        "libcurl4-openssl-dev"
+        "odbc-mariadb"
+        "libical-dev"
+        "libneon27-dev"
+        "libsrtp2-dev"
+        "libspandsp-dev"
+        "sudo"
+        "subversion"
+        "libtool-bin"
+        "python-dev-is-python3"
+        "unixodbc"
+        "libjansson-dev"
+        "nodejs"
+        "npm"
+        "ipset"
+        "iptables"
+        "fail2ban"
+        "htop"
+        "liburiparser-dev"
+        "postfix"
+        "tcpdump"
+        "sngrep"
+        "libavdevice-dev"
+        "tftpd-hpa"
+        "xinetd"
+        "lame"
+        "haproxy"
+        "screen"
+        "easy-rsa"
+        "openvpn"
+        "sysstat"
+        "apt-transport-https"
+        "lsb-release"
+        "ca-certificates"
+        "cron"
 )
 for i in "${!DEPPKGS[@]}"; do
-	pkg_install ${DEPPKGS[$i]}
+        pkg_install ${DEPPKGS[$i]}
 done
 
 
@@ -432,7 +413,16 @@ install_mongodb
 
 # Install libfdk
 setCurrentStep "Setting up libfdk"
-install_libfdk
+if isinstalled libfdk-aac-dev; then
+        log "libfdk-aac2 already present...."
+else
+        wget "http://deb.debian.org/debian/pool/non-free/f/fdk-aac/libfdk-aac-dev_${AACVERSION}_${arch}.deb" -O "/tmp/libfdk-aac-dev_${AACVERSION}_${arch}.deb" >> "$log" 2>&1
+        wget "http://deb.debian.org/debian/pool/non-free/f/fdk-aac/libfdk-aac2_${AACVERSION}_${arch}.deb" -O "/tmp/libfdk-aac2_${AACVERSION}_${arch}.deb" >> "$log" 2>&1
+        dpkg -i /tmp/libfdk-aac2_${AACVERSION}_${arch}.deb >> "$log" 2>&1
+        dpkg -i /tmp/libfdk-aac-dev_${AACVERSION}_${arch}.deb >> "$log" 2>&1
+        rm -f /tmp/libfdk-aac2_${AACVERSION}_${arch}.deb >> "$log" 2>&1
+        rm -f /tmp/libfdk-aac-dev_${AACVERSION}_${arch}.deb >> "$log" 2>&1
+fi
 
 setCurrentStep "Removing unnecessary packages"
 apt autoremove -y >> "$log" 2>&1
@@ -446,12 +436,12 @@ message "Execution time to install all the dependent packages : $execution_time 
 setCurrentStep "Setting up folders and asterisk config"
 groupExists="`getent group asterisk || echo ''`"
 if [ "${groupExists}" = "" ]; then
-	groupadd -r asterisk
+        groupadd -r asterisk
 fi
 
 userExists="`getent passwd asterisk || echo ''`"
 if [ "${userExists}" = "" ]; then
-	useradd -r -g asterisk -d /home/asterisk -M -s /bin/bash asterisk
+        useradd -r -g asterisk -d /home/asterisk -M -s /bin/bash asterisk
 fi
 
 # Adding asterisk to the sudoers list
@@ -468,7 +458,7 @@ sed -i -e 's/^openssl_conf = openssl_init$/openssl_conf = default_conf/' /etc/ss
 
 isSSLConfigAdapted=$(grep "FreePBX 17 changes" /etc/ssl/openssl.cnf |wc -l)
 if [ "0" = "${isSSLConfigAdapted}" ]; then
-	cat <<EOF >> /etc/ssl/openssl.cnf
+        cat <<EOF >> /etc/ssl/openssl.cnf
 # FreePBX 17 changes - begin
 [ default_conf ]
 ssl_conf = ssl_sect
@@ -484,21 +474,21 @@ fi
 #Disabling ipv6 to avoid localhost to resolving to ipv6 address (which could break nodeJs)
 isIPv6Disabled=$(grep "FreePBX 17 changes" /etc/sysctl.conf |wc -l)
 if [ "0" = "${isIPv6Disabled}" ]; then
-	cat <<EOF >> /etc/sysctl.conf
+        cat <<EOF >> /etc/sysctl.conf
 # FreePBX 17 changes - begin
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
 # FreePBX 17 changes - end
 EOF
-	/usr/sbin/sysctl -p >> $log 2>&1
+        /usr/sbin/sysctl -p >> $log 2>&1
 fi
 
 
 # Setting screen configuration
 isScreenRcAdapted=$(grep "FreePBX 17 changes" /root/.screenrc |wc -l)
 if [ "0" = "${isScreenRcAdapted}" ]; then
-	cat <<EOF >> /root/.screenrc
+        cat <<EOF >> /root/.screenrc
 # FreePBX 17 changes - begin
 hardstatus alwayslastline
 hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{=kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B}%Y-%m-%d %{W}%c %{g}]'
@@ -510,10 +500,10 @@ fi
 # Setting VIM configuration for mouse copy paste
 isVimRcAdapted=$(grep "FreePBX 17 changes" /etc/vim/vimrc.local |wc -l)
 if [ "0" = "${isVimRcAdapted}" ]; then
-	VIMRUNTIME=`vim -e -T dumb --cmd 'exe "set t_cm=\<C-M>"|echo $VIMRUNTIME|quit' | tr -d '\015' `
-	VIMRUNTIME_FOLDER=`echo $VIMRUNTIME | sed 's/ //g'`
+        VIMRUNTIME=`vim -e -T dumb --cmd 'exe "set t_cm=\<C-M>"|echo $VIMRUNTIME|quit' | tr -d '\015' `
+        VIMRUNTIME_FOLDER=`echo $VIMRUNTIME | sed 's/ //g'`
 
-	cat <<EOF >> /etc/vim/vimrc.local
+        cat <<EOF >> /etc/vim/vimrc.local
 " FreePBX 17 changes - begin
 " This file loads the default vim options at the beginning and prevents
 " that they are being loaded again later. All other options that will be set,
@@ -544,12 +534,12 @@ fi
 
 # Install Asterisk
 if [ $noast ] ; then
-	message "Skipping Asterisk installation due to noastrisk option"
+        message "Skipping Asterisk installation due to noastrisk option"
 else
-	# TODO Need to check if asterisk installed already then remove that and install new ones.
-	# Install Asterisk 21
-	setCurrentStep "Installing Asterisk packages."
-	install_asterisk $ASTVERSION
+        # TODO Need to check if asterisk installed already then remove that and install new ones.
+        # Install Asterisk 21
+        setCurrentStep "Installing Asterisk packages."
+        install_asterisk $ASTVERSION
 fi
 
 # Install PBX dependent packages
@@ -557,20 +547,20 @@ setCurrentStep "Installing FreePBX packages"
 
 # Install ionCube
 if [ $noioncube ] ; then
-	message "Skipping ionCube installation due to noioncube option"
+        message "Skipping ionCube installation due to noioncube option"
 else
-	# TODO Need to check if ioncube installed already then remove that and install new ones.
-	# Install ionCube
-	setCurrentStep "Installing ionCube packages."
-	pkg_install ioncube-loader-82
+        # TODO Need to check if ioncube installed already then remove that and install new ones.
+        # Install ionCube
+        setCurrentStep "Installing ionCube packages."
+        pkg_install ioncube-loader-82
 fi
 
 FPBXPKGS=("sysadmin17"
-	   "sangoma-pbx17"
-	   "ffmpeg"
+           "sangoma-pbx17"
+           "ffmpeg"
    )
 for i in "${!FPBXPKGS[@]}"; do
-	pkg_install ${FPBXPKGS[$i]}
+        pkg_install ${FPBXPKGS[$i]}
 done
 
 
@@ -593,11 +583,10 @@ log "Restarting fail2ban "
 
 
 if [ $nofpbx ] ; then
-	message "Skipping FreePBX 17 fresh tarball installation due to nofreepbx option"
+        message "Skipping FreePBX 17 fresh tarball installation due to nofreepbx option"
 else
-	setCurrentStep "Installing FreePBX 17"
-	pkg_install freepbx17
-fi
+        setCurrentStep "Installing FreePBX 17"
+        pkg_install freepbx17
 
 # Reinstalling modules to ensure all the modules are enabled/installed
 setCurrentStep "Installing Sysadmin module"
@@ -616,11 +605,13 @@ fwconsole ma upgradeall >> $log 2>&1
 setCurrentStep "reloading and restarting FreePBX 17"
 fwconsole reload >> $log 2>&1
 fwconsole restart >> $log 2>&1
-
+fi
 
 setCurrentStep "Wrapping up the installation process"
 systemctl daemon-reload >> "$log" 2>&1
+if [ ! $nofpbx ] ; then
 systemctl enable freepbx >> "$log" 2>&1
+fi
 
 #delete apache2 index.html as we do not need that file
 rm -f /var/www/html/index.html
@@ -635,7 +626,14 @@ rm -f /var/www/html/index.html
 a2enmod rewrite >> "$log" 2>&1
 
 #Enabling freepbx apache configuration
-cd /etc/apache2/sites-enabled/ && ln -s ../sites-available/freepbx.conf freepbx.conf >> "$log" 2>&1
+#Enabling freepbx apache configuration
+cd /etc/apache2/sites-enabled/
+if [ ! -f "freepbx.conf" ]; then
+    ln -s ../sites-available/freepbx.conf freepbx.conf >> "$log" 2>&1
+else
+    message "freepbx.conf already exists. Skipping symbolic link creation."
+fi
+
 
 #Setting postfix size to 100MB
 /usr/sbin/postconf -e message_size_limit=102400000
@@ -651,10 +649,13 @@ sed -i 's/\(^ServerSignature \).*/\1Off/' /etc/apache2/conf-available/security.c
 systemctl restart apache2 >> "$log" 2>&1
 
 # Refresh signatures
+if [ ! $nofpbx ] ; then
 fwconsole ma refreshsignatures >> "$log" 2>&1
-
+fi
 #Do not want to upgrade initial(first time setup) packages
+if [ ! $nofpbx ] ; then
 apt-mark hold freepbx17
+fi
 apt-mark hold sangoma-pbx17
 
 setCurrentStep "Installation successful."
@@ -665,5 +666,6 @@ execution_time="$(($(date +%s) - $start))"
 message "Total script Execution Time: $execution_time"
 message "Finished FreePBX 17 installation process for $host $kernel"
 message "Join us on the FreePBX Community Forum: https://community.freepbx.org/ ";
-
+if [ ! $nofpbx ] ; then
 fwconsole motd
+fi
