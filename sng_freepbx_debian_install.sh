@@ -44,7 +44,7 @@ echo "" > $log
 # Get parameters
 POSITIONAL_ARGS=()
 
-#compairing version
+#Comparing version
 compare_version() {
         if dpkg --compare-versions "$1" "gt" "$2"; then
                 result=0
@@ -112,7 +112,7 @@ while [[ $# -gt 0 ]]; do
 			shift # past argument
 			;;
                 --skipversion)
-                        skipversion=ture
+                        skipversion=true
                         shift # past argument
                         ;;
 		-*|--*)
