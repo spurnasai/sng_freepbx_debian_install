@@ -639,13 +639,38 @@ if [[ "$dahdi" == true ]]; then
            "libpri-devel"
            "wanpipe"
            "wanpipe-devel"
-           "dahdi-linux-kmod-${kernel_version}"
-           "kmod-wanpipe-${kernel_version}"
 	)
 
         for i in "${!DAHDIPKGS[@]}"; do
                 pkg_install ${DAHDIPKGS[$i]}
         done
+
+    supported_version="6.1.0-21"
+
+    if dpkg --compare-versions "$kernel_version" "lt" "$supported_version"; then
+       message "Detected kernel version $kernel_version which is <= $supported_version."
+       message "Holding current kernel version to prevent automatic updates."
+       kernel_packages=$( apt-cache search linux-image | grep -E "^linux-image-[0-9]" | awk '{print $1}')
+       for package in $kernel_packages; do
+        # Extract the version from the package name
+        version=$(echo "$package" | awk -F'-' '{print $3"-"$4}')
+          # Compare the version with the current kernel version and supported version
+          if dpkg --compare-versions "$version" "gt" "$kernel_version" && \
+             dpkg --compare-versions "$version" "le" "$supported_version"; then
+             apt-mark hold "$package"
+          fi
+       done
+       message "Installing dahdi-linux-kmod and kmod-wanpipe for kernel version $kernel_version..."
+       pkg_install "dahdi-linux-kmod-${kernel_version}"
+       pkg_install "kmod-wanpipe-${kernel_version}"
+    elif dpkg --compare-versions "$kernel_version" "eq" "$supported_version"; then
+         pkg_install "dahdi-linux-kmod-${kernel_version}"
+         pkg_install "kmod-wanpipe-${kernel_version}"
+    else
+       message "Sorry, DAHDI and Wanpipe were supported up to kernel version $supported_version."
+       message "Please downgrade your kernel version to $supported_version to use them."
+       exit 1
+    fi
 fi
 
 # Install mongod
