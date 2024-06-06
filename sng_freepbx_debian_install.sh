@@ -23,6 +23,7 @@
 #####################################################################################
 if ! grep -Fxq 'export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' /root/.bashrc; then
   echo 'export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' | sudo tee -a /root/.bashrc > /dev/null
+  export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 fi
 set -e
 SCRIPTVER="1.3"
@@ -1056,6 +1057,12 @@ fi
 setCurrentStep "Holding Packages"
 
 hold_packages
+
+# Update logrotate configuration
+if grep -q '^#dateext' /etc/logrotate.conf; then
+   message "Setting up logrotate.conf"
+   sed -i 's/^#dateext/dateext/' /etc/logrotate.conf
+fi
 
 setCurrentStep "Installation successful."
 
